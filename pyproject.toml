@@ -12,7 +12,10 @@ qdrant-client = "^1.7.0"
 langchain-core = "^0.1.22"
 python-dotenv = "^1.0.0"
 pydantic = "^2.10.6"
+pydantic-settings = "^2.2.1"
 google-generativeai = "^0.3.2"
+openai = "^1.12.0"
+mkdocs-git-revision-date-localized-plugin = "^1.3.0"
 
 [tool.poetry.group.test.dependencies]
 pytest = "^8.0.0"
@@ -24,6 +27,12 @@ black = "^24.1.1"
 isort = "^5.13.2"
 mypy = "^1.8.0"
 
+[tool.poetry.group.docs.dependencies]
+griffe = "^1.5.7"
+mkdocs = "^1.6.1"
+mkdocs-material = "^9.6.4"
+mkdocstrings = {extras = ["python"], version = "^0.28.1"}
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
@@ -31,3 +40,32 @@ build-backend = "poetry.core.masonry.api"
 [tool.pytest.ini_options]
 pythonpath = ["."]
 asyncio_mode = "strict"
+
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+line_length = 88
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_optional = true
