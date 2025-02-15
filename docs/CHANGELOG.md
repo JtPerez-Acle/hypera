@@ -5,6 +5,46 @@ All notable changes to the HyperA project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Enhanced multi-agent reasoning system with rich metadata integration
+- Gemini 1.5 Pro integration for 2M token context window
+- Comprehensive test suite for reasoning module
+- Rich metadata extraction and integration
+- Natural language summaries using Gemini
+- Actionable recommendations generation
+
+### Changed
+- Updated agent system prompts to better leverage metadata
+- Improved context enrichment with metadata and Gemini retrieval
+- Enhanced agent analysis with concrete examples and evidence
+- Optimized parallel agent execution for better performance
+
+### Fixed
+- Improved error handling in agent analysis
+- Better context management to avoid redundant processing
+- Enhanced type safety with Pydantic models
+
+## [0.1.6] - 2025-02-15
+
+### Added
+- Initial DeepSeek R1 reasoning engine integration
+  - Created new `reasoning` module with proper structure
+  - Implemented type definitions with Pydantic models
+  - Added placeholder for DeepSeek client integration
+  - Designed structured prompt engineering system
+
+### Infrastructure
+- Set up reasoning module with proper architecture
+- Added type-safe interfaces for reasoning requests/responses
+- Prepared integration points with Gemini retrieval system
+
+### Technical Debt
+- Implement actual DeepSeek R1 client integration when SDK is available
+- Add comprehensive test suite for reasoning module
+- Implement proper error handling and recovery mechanisms
+
 ## [0.1.5] - 2025-02-14
 
 ### Changed
