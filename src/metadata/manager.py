@@ -4,21 +4,25 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 
-from pydantic import BaseModel, Field
+from .core.metadata import CodeMetadata
+from .parsing.extractors import MetadataExtractor, MetadataRequest
+from .parsing.types import MetadataExtractionLevel
 
-from .extractor import MetadataExtractor
-from ..core.coordinator import AgentCoordinator
+@dataclass
+class CodeChunk:
+    """A chunk of code with associated metadata."""
+    content: str
+    language: str
+    metadata: Optional[CodeMetadata] = None
 
-
-class MetadataPattern(BaseModel):
-    """Pattern discovered in code metadata."""
-    pattern_type: str
-    frequency: int
-    confidence: float
-    last_seen: datetime
-    examples: List[str] = Field(default_factory=list)
-    context: Dict[str, Any] = Field(default_factory=dict)
-
+def process_code_chunk(chunk: CodeChunk, extraction_level: str = "MINIMAL") -> CodeChunk:
+    """Process a code chunk to extract metadata."""
+    extractor = MetadataExtractor()
+    request = MetadataRequest(
+        extraction_level=MetadataExtractionLevel[extraction_level]
+    )
+    chunk.metadata = extractor.extract(chunk.content, chunk.language, request)
+    return chunk
 
 @dataclass
 class ExtractionStrategy:
@@ -36,13 +40,11 @@ class AdaptiveMetadataManager:
 
     def __init__(
         self,
-        coordinator: Optional[AgentCoordinator] = None,
         extractor: Optional[MetadataExtractor] = None
     ):
         """Initialize the manager."""
-        self.coordinator = coordinator
         self.extractor = extractor or MetadataExtractor()
-        self.patterns: Dict[str, MetadataPattern] = {}
+        self.patterns: Dict[str, Dict[str, Any]] = {}
         self.strategies: Dict[str, ExtractionStrategy] = {
             "quick": ExtractionStrategy(
                 priority=1,
@@ -67,8 +69,7 @@ class AdaptiveMetadataManager:
     async def extract_metadata(
         self,
         code: str,
-        file_path: str,
-        agent_id: Optional[str] = None
+        file_path: str
     ) -> Dict[str, Any]:
         """
         Extract metadata using the best strategy for the context.
@@ -76,12 +77,11 @@ class AdaptiveMetadataManager:
         Args:
             code: Source code to analyze
             file_path: Path to the source file
-            agent_id: Optional ID of the requesting agent
             
         Returns:
             Extracted metadata
         """
-        strategy = await self._select_strategy(code, agent_id)
+        strategy = await self._select_strategy(code)
         
         try:
             metadata = await self.extractor.extract(
@@ -99,13 +99,6 @@ class AdaptiveMetadataManager:
             # Learn from successful extraction
             await self._learn_patterns(metadata)
             
-            # Share knowledge if coordinator exists
-            if self.coordinator and agent_id:
-                await self.coordinator.share_knowledge(
-                    agent_id,
-                    {"metadata_patterns": self.patterns}
-                )
-            
             return metadata
             
         except Exception as e:
@@ -115,23 +108,14 @@ class AdaptiveMetadataManager:
 
     async def _select_strategy(
         self,
-        code: str,
-        agent_id: Optional[str] = None
+        code: str
     ) -> ExtractionStrategy:
         """Select the best strategy based on code and context."""
-        # Get agent context if available
-        agent_context = None
-        if self.coordinator and agent_id:
-            agent_context = await self.coordinator.get_agent_context(agent_id)
-        
         # Estimate code complexity
         complexity = self._estimate_complexity(code)
         
-        # Select strategy based on complexity and context
-        if complexity > 0.8 or (
-            agent_context and
-            agent_context.get("window_size", 0) > 1_000_000
-        ):
+        # Select strategy based on complexity
+        if complexity > 0.8:
             return self.strategies["comprehensive"]
         elif complexity > 0.4:
             return self.strategies["deep"]
@@ -163,16 +147,15 @@ class AdaptiveMetadataManager:
             if isinstance(value, (list, dict)):
                 pattern_type = f"{key}_structure"
                 if pattern_type not in self.patterns:
-                    self.patterns[pattern_type] = MetadataPattern(
-                        pattern_type=pattern_type,
-                        frequency=1,
-                        confidence=1.0,
-                        last_seen=datetime.now(),
-                        examples=[str(value)[:100]]  # Limit example size
-                    )
+                    self.patterns[pattern_type] = {
+                        "frequency": 1,
+                        "confidence": 1.0,
+                        "last_seen": datetime.now(),
+                        "examples": [str(value)[:100]]  # Limit example size
+                    }
                 else:
                     pattern = self.patterns[pattern_type]
-                    pattern.frequency += 1
-                    pattern.last_seen = datetime.now()
-                    if len(pattern.examples) < 5:  # Keep up to 5 examples
-                        pattern.examples.append(str(value)[:100])
+                    pattern["frequency"] += 1
+                    pattern["last_seen"] = datetime.now()
+                    if len(pattern["examples"]) < 5:  # Keep up to 5 examples
+                        pattern["examples"].append(str(value)[:100])

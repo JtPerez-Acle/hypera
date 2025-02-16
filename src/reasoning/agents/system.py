@@ -1,15 +1,8 @@
 """Reasoning system that orchestrates multiple agents for comprehensive code analysis."""
 
-from typing import List, Optional
-
-from .base import BaseAgent
-from .behavioral import BehavioralAnalyzer
-from .security import SecurityAnalyzer
-from .patterns import PatternAnalyzer
-from .metrics import MetricsAnalyzer
-from .dependencies import DependencyAnalyzer
-from ..metadata.extractor import MetadataExtractor
-from ..retrieval.gemini import GeminiRetriever
+from typing import List, Optional, Dict, Any
+from ...metadata.extractor import MetadataExtractor
+from ...metadata.types import MetadataRequest, MetadataExtractionLevel
 from ..types import (
     AgentAnalysis,
     CodeContext,
@@ -18,6 +11,7 @@ from ..types import (
     DesignPattern,
     CodeMetrics,
     DependencyInfo,
+    AgentDependencies
 )
 
 

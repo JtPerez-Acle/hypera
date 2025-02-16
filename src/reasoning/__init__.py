@@ -1,12 +1,8 @@
 """
-HyperA Reasoning Module.
-
-This module implements the DeepSeek R1-based reasoning engine that processes
-enriched context from the retrieval system (Gemini 1.5 Pro) to perform
-deep code analysis and understanding.
+Reasoning module for code analysis and understanding.
 """
 
-from .deepseek import DeepSeekReasoner
-from .types import ReasoningRequest, ReasoningResponse
+from .types import MetadataRequest, MetadataExtractionLevel
+from .agents import BaseAgent
 
-__all__ = ["DeepSeekReasoner", "ReasoningRequest", "ReasoningResponse"]
+__all__ = ['MetadataRequest', 'MetadataExtractionLevel', 'BaseAgent']

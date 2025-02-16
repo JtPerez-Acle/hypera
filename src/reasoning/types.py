@@ -16,6 +16,85 @@ class CodeUnderstandingLevel(Enum):
     BEHAVIORAL = "behavioral"  # Runtime behavior and side effects
 
 
+class MetadataExtractionLevel(Enum):
+    """Levels of metadata extraction depth."""
+    MINIMAL = "minimal"  # Basic imports and signatures only
+    STANDARD = "standard"  # + types and direct dependencies
+    DEEP = "deep"  # + control flow and data flow
+    COMPREHENSIVE = "comprehensive"  # + cross-file analysis
+
+
+class MetadataRequest(BaseModel):
+    """Configuration for metadata extraction requests."""
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "extraction_level": "standard",
+                "include_types": True,
+                "include_dependencies": True,
+                "max_dependency_depth": 2,
+                "include_docstrings": True,
+                "include_comments": False
+            }
+        }
+    )
+
+    extraction_level: MetadataExtractionLevel = Field(
+        default=MetadataExtractionLevel.STANDARD,
+        description="Desired depth of metadata extraction"
+    )
+    include_types: bool = Field(
+        default=True,
+        description="Whether to include type information"
+    )
+    include_dependencies: bool = Field(
+        default=True,
+        description="Whether to include dependency information"
+    )
+    max_dependency_depth: Optional[int] = Field(
+        default=None,
+        description="Maximum depth for dependency analysis"
+    )
+    include_docstrings: bool = Field(
+        default=True,
+        description="Whether to include docstrings"
+    )
+    include_comments: bool = Field(
+        default=False,
+        description="Whether to include comments"
+    )
+
+
+class CodeMetadata(BaseModel):
+    """Structured metadata about a code chunk."""
+    model_config = ConfigDict(frozen=True)
+
+    # Basic information
+    imports: List[str] = Field(default_factory=list, description="Import statements")
+    functions: List[Dict[str, Any]] = Field(default_factory=list, description="Functions")
+    classes: List[Dict[str, Any]] = Field(default_factory=list, description="Classes")
+
+    # Type information
+    types: Optional[Dict[str, str]] = Field(None, description="Type information")
+
+    # Dependency information
+    dependencies: Optional[Dict[str, List[str]]] = Field(None, description="Dependencies")
+    dependency_depth: Optional[int] = Field(None, description="Dependency depth")
+
+    # Documentation
+    docstrings: Optional[Dict[str, str]] = Field(None, description="Docstrings")
+    comments: Optional[List[str]] = Field(None, description="Comments")
+
+    # Analysis results
+    control_flow: Optional[List[Dict[str, Any]]] = Field(None, description="Control flow")
+    data_flow: Optional[List[Dict[str, Any]]] = Field(None, description="Data flow")
+    cross_file_refs: Optional[Dict[str, List[str]]] = Field(None, description="Cross-file references")
+
+    # Status
+    success: bool = Field(True, description="Success status")
+    error: Optional[str] = Field(None, description="Error message")
+
+
 class CodeContext(BaseModel):
     """Rich context about the code being analyzed."""
     model_config = ConfigDict(
@@ -27,7 +106,17 @@ class CodeContext(BaseModel):
                 "end_line": 13,
                 "language": "python",
                 "imports": ["from typing import List"],
-                "dependencies": ["database.py", "config.py"]
+                "dependencies": ["database.py", "config.py"],
+                "metadata": {
+                    "imports": ["import os"],
+                    "functions": [{"name": "process_data", "params": ["items"]}],
+                    "classes": [],
+                    "types": {"items": "List[dict]"},
+                    "dependencies": {"processor.py": ["database.py"]},
+                    "dependency_depth": 1,
+                    "docstrings": {"process_data": "Process a list of items"},
+                    "comments": ["# This is a comment"]
+                }
             }
         }
     )
@@ -39,6 +128,7 @@ class CodeContext(BaseModel):
     language: str = Field(description="Programming language of the code")
     imports: List[str] = Field(default_factory=list, description="Import statements")
     dependencies: List[str] = Field(default_factory=list, description="Related files")
+    metadata: Optional[CodeMetadata] = Field(None, description="Metadata about the code")
 
 
 class SecurityIssue(BaseModel):

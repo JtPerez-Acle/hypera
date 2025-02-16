@@ -1,9 +1,9 @@
 [tool.poetry]
 name = "hypera"
-version = "0.1.6"
-description = "Next-Generation Codebase Understanding Project"
-authors = ["Your Name <your.email@example.com>"]
-readme = "README.md"
+version = "0.1.0"
+description = "Hyper-human codebase understanding system using Gemini 1.5 Pro and DeepSeek"
+authors = ["JtPerez-Acle"]
+readme = "docs/OBJECTIVE.md"
 packages = [{include = "src"}]
 
 [tool.poetry.dependencies]

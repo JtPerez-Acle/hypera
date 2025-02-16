@@ -1,0 +1,123 @@
+######################################################################
+# .windsurfrules - Next-Generation Codebase Understanding Project Rules
+#
+# Project Vision:
+#   Build a hyper-human codebase understanding system that leverages
+#   advanced retrieval (Gemini 1.5 Pro with a 2-million token context window)
+#   and deep reasoning (DeepSeek R1) to grasp every nuance of our code.
+#   Our goal is to create robust, scalable, and future-proof code that
+#   integrates rich metadata for seamless retrieval and reasoning.
+######################################################################
+
+###############################
+# 1. Coding Standards & Best Practices
+###############################
+# - Adhere to language-specific best practices (Rust, TypeScript, Python).
+# - Follow clean code principles: use clear, descriptive naming, maintain modularity,
+#   and ensure comprehensive documentation.
+# - Prioritize readability, maintainability, and testability.
+#
+# [Rule: "Coding Standards" - Generated code must strictly follow language best practices.]
+
+###############################
+# 2. Framework & Technology Alignment
+###############################
+# - Use Gemini 1.5 Pro for high-capacity retrieval and DeepSeek R1 for code reasoning.
+# - Integrate Qdrant for vector storage and retrieval, ensuring fast, scalable access
+#   to embeddings that combine both code and metadata.
+# - Code interfacing with these components must respect their APIs and expected data formats.
+#
+# [Rule: "Framework Alignment" - Ensure all code and integrations conform to Gemini 1.5 Pro,
+#  DeepSeek R1, and Qdrant requirements.]
+
+###############################
+# 3. Project Structure & File Organization
+###############################
+# - The project root must include essential configuration files (including .windsurfrules)
+#   and directories structured by function (e.g., /src, /tests, /config, /docs).
+# - Enforce a clear separation between modules: parsing, retrieval, metadata management,
+#   and reasoning.
+# - There are two documents in the /docs directory, called CHANGELOG.md and DEVELOPMENT_PLAN.md, these files should be updated every time we make a significant change to the project.
+#
+# [Rule: "Project Structure" - Maintain the prescribed file/directory organization for clarity.]
+
+###############################
+# 4. Rich Metadata Integration
+###############################
+# - All generated code should be built around the concept of “rich metadata.”
+# - When processing code chunks, ensure that metadata (e.g., AST snippets, function signatures,
+#   dependency graphs) is integrated and appended in a structured manner.
+# - Combine the raw code and its metadata in a unified format (e.g., using clear delimiters)
+#   to support efficient embedding and retrieval.
+#
+# [Rule: "Metadata Integration" - Always merge code with its metadata using the defined structure.]
+
+###############################
+# 5. Output, Debugging & Transparency
+###############################
+# - Every time the AI applies any rule(s) during code generation, it must prepend the output
+#   with a clear statement of the rule(s) being applied.
+# - Example prefix: "Applying Rule(s): [Coding Standards], [Framework Alignment]".
+# - This protocol aids in debugging and ensures adherence to our custom guidelines.
+#
+# [Rule: "Output Transparency" - Prepend all outputs with an explicit statement of applied rule(s).]
+
+###############################
+# 6. Continuous Improvement & Self-Reflection
+###############################
+# - The AI is encouraged to question and document its technical decisions.
+# - If conflicts or ambiguities arise, state the reasoning and propose alternative solutions.
+# - This feedback loop is critical to refining our approach as the project evolves.
+#
+# [Rule: "Continuous Improvement" - Always report technical decisions, ambiguities, and proposed alternatives.]
+
+###############################
+# 7. Testing & Validation
+###############################
+# - All generated code must include or be accompanied by tests (unit and integration) where applicable.
+# - Prioritize code that is verifiable, maintainable, and resilient.
+#
+# [Rule: "Testing & Validation" - Ensure generated code is testable and includes appropriate tests.]
+
+###############################
+# 8. Tech Stack & Dependencies
+###############################
+- **Programming Language:**  
+  - Python 3.12
+
+- **Vector Database:**  
+  - Qdrant: Utilized for scalable, high-performance vector search, advanced filtering, and persistence.
+
+- **AI and Reasoning Components:**  
+  - Google's Generative AI Package: For state-of-the-art code generation and analysis.
+  - DeepSeek: Employed for deep reasoning and comprehensive code understanding.
+  - Gemini 1.5 Pro: Leverage its 2-million-token context window for retrieval tasks where applicable.
+
+- **Orchestration & Pipeline Management:**  
+  - Utilize libraries such as LangChain or LlamaIndex to coordinate the RAG pipeline, ensuring seamless integration of retrieval, embedding, and reasoning processes.
+
+- **Metadata Extraction & Parsing Tools:**  
+  - Custom modules and/or established libraries (e.g., Python’s `ast`, Tree-sitter for multi-language support) to extract rich metadata (AST fragments, function signatures, dependency graphs) from code chunks.
+
+- **Testing & Quality Assurance:**  
+  - Pytest (or equivalent) for unit and integration testing to validate code functionality and maintain resilience.
+  - Additional tools for static analysis and code linting as necessary.
+
+- **Dependency & Environment Management:**  
+  - Use dependency management tools (Poetry) to ensure reproducibility and ease of updates across the tech stack. We are on a Conda environment called `hypera`.
+
+- **Documentation & Versioning:**  
+  - Maintain thorough documentation for integration points and component interactions to support continuous improvement and scalable development.
+
+######################################################################
+# Directives for AI Behavior:
+#
+# - Follow all the rules above without exception.
+# - At the beginning of every output, explicitly state the rule(s) being applied.
+#   For example: "Applying Rule(s): [Framework Alignment], [Output Transparency]".
+# - If you encounter a situation where a rule might conflict with a technical decision,
+#   document the conflict and suggest a reasoned alternative.
+# - The ultimate goal is to build a robust, scalable codebase understanding system
+#   that embodies hyper-human code comprehension.
+#   Important: Maintain a clean chain of thought focus and BE SURE TO FOLLOW THE RULES AND CREATE/MODIFY FILES WHEN YOU NEED!
+######################################################################
