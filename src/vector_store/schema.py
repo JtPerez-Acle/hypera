@@ -5,14 +5,27 @@ This module defines the data structures for storing code chunks and their metada
 in the vector database.
 """
 
+from enum import Enum
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 
+class Language(str, Enum):
+    """Programming language enum."""
+    PYTHON = "python"
+    JAVASCRIPT = "javascript"
+    TYPESCRIPT = "typescript"
+    RUST = "rust"
+    GO = "go"
+    JAVA = "java"
+    CPP = "cpp"
+    CSHARP = "csharp"
+    UNKNOWN = "unknown"
+
 class CodeChunkMetadata(BaseModel):
     """Metadata for a code chunk."""
     chunk_type: str = Field(..., description="Type of code chunk (function, class, etc.)")
-    language: str = Field(..., description="Programming language")
+    language: Language = Field(..., description="Programming language")
     file_path: str = Field(..., description="Path to source file")
     start_line: int = Field(..., description="Starting line number")
     end_line: int = Field(..., description="Ending line number")

@@ -1,8 +1,0 @@
-Metadata-Version: 2.2
-Name: hypera
-Version: 0.1.0
-Summary: Hyper-human codebase understanding system
-Requires-Python: >=3.10
-Requires-Dist: qdrant-client
-Requires-Dist: pydantic
-Requires-Dist: pytest

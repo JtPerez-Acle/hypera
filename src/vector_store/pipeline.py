@@ -6,88 +6,71 @@ and storing their embeddings in the vector database.
 """
 
 import asyncio
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict
 from pathlib import Path
-from qdrant_client.http.models import PointStruct
-from .client import get_qdrant_client
-from .collections import ensure_collections, COLLECTIONS_CONFIG
 from .schema import CodeChunkPayload, Language
 from .chunking import chunk_python_file, detect_language
-from .embeddings import initialize_openai, process_chunks_batch
+from .llm_metadata import LLMMetadataGenerator
+from .client import get_qdrant_client
+from .collections import ensure_collections, COLLECTIONS_CONFIG
 
 class Pipeline:
     """
-    Main pipeline for processing code files and storing embeddings.
+    Main pipeline for processing code files with LLM-based analysis.
     
-    This class handles the entire process from code chunking to
-    embedding generation (via OpenAI) and storage in Qdrant.
-    The stored embeddings will be used by Gemini 1.5 Pro for
-    retrieval and context holding.
-    
-    Metadata:
-        - Dependencies: All vector_store modules
-        - Performance: Async batch processing
-        - Error Handling: Comprehensive error states
+    This class handles the process from basic code chunking to
+    LLM-based metadata generation and storage in Qdrant.
     """
     
-    def __init__(self):
-        """Initialize the pipeline and ensure collections exist."""
+    def __init__(self, gemini_api_key: str):
+        """Initialize the pipeline components."""
         self.qdrant = get_qdrant_client()
-        initialize_openai()
+        self.llm_generator = LLMMetadataGenerator(gemini_api_key)
         ensure_collections()
     
     async def process_file(self, file_path: str) -> List[str]:
         """
-        Process a single file and store its embeddings.
+        Process a single file with LLM-enhanced analysis.
         
         Args:
             file_path: Path to the file to process
             
         Returns:
             List[str]: IDs of the stored points
-            
-        Metadata:
-            - Dependencies: chunking, embeddings modules
-            - Performance: Async processing
-            - Error Handling: File access, processing errors
         """
         language = detect_language(file_path)
         chunks: List[CodeChunkPayload] = []
         
-        # Generate chunks based on language
+        # Basic structural chunking
         if language == Language.PYTHON:
             chunks.extend(chunk_python_file(file_path))
         else:
-            # TODO: Implement chunking for other languages
             raise NotImplementedError(f"Language {language} not yet supported")
         
-        # Process chunks in batches
-        processed_chunks = await process_chunks_batch(chunks)
+        if not chunks:
+            return []
+        
+        # Enrich with LLM-generated metadata
+        enriched_chunks = await self.llm_generator.analyze_chunks(chunks)
         
         # Store in Qdrant
         points = []
-        for chunk in processed_chunks:
-            point_id = f"{chunk.metadata.file_path}:{chunk.metadata.start_line}"
-            point = PointStruct(
-                id=point_id,
-                vector=chunk.embedding,
-                payload={
-                    "content": chunk.content,
-                    **chunk.metadata.dict()
-                }
-            )
-            points.append(point)
+        for chunk in enriched_chunks:
+            points.append({
+                "id": f"{file_path}:{chunk.metadata.start_line}",
+                "payload": chunk.dict(),
+                "vector": chunk.embedding if chunk.embedding else []
+            })
         
-        # Upload points in batches
-        if points:
-            self.qdrant.upsert(
-                collection_name="code_chunks",
-                points=points
-            )
-        
-        return [p.id for p in points]
+        collection = self.qdrant.get_collection("code_chunks")
+        result = await collection.upsert(points=points)
+        return [str(p.id) for p in result.points]
     
-    async def process_directory(self, directory: str, recursive: bool = True) -> Dict[str, List[str]]:
+    async def process_directory(
+        self,
+        directory: str,
+        recursive: bool = True
+    ) -> Dict[str, List[str]]:
         """
         Process all supported files in a directory.
         
@@ -97,11 +80,6 @@ class Pipeline:
             
         Returns:
             Dict[str, List[str]]: Mapping of files to their stored point IDs
-            
-        Metadata:
-            - Dependencies: process_file
-            - Performance: Parallel async processing
-            - Error Handling: Directory traversal, file errors
         """
         results = {}
         path = Path(directory)
@@ -113,7 +91,6 @@ class Pipeline:
                     point_ids = await self.process_file(str(file_path))
                     results[str(file_path)] = point_ids
                 except Exception as e:
-                    # Log error and continue with other files
                     print(f"Error processing {file_path}: {e}")
         
         return results

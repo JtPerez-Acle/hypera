@@ -44,6 +44,12 @@ class RetrievalFilter(BaseModel):
 
 class CodeContext(BaseModel):
     """Context information for code."""
+    code_snippet: str
+    file_path: Optional[str] = None
+    start_line: Optional[int] = None
+    end_line: Optional[int] = None
+    language: str = "python"
+    imports: List[str] = Field(default_factory=list)
     dependencies: List[str] = Field(default_factory=list)
     callers: List[str] = Field(default_factory=list)
     related_files: List[str] = Field(default_factory=list)
@@ -55,6 +61,11 @@ class CodeContext(BaseModel):
             "json_encoders": {datetime: lambda v: v.isoformat()}
         }
     )
+
+    @property
+    def code(self) -> str:
+        """Alias for code_snippet for backward compatibility."""
+        return self.code_snippet
 
 class RetrievalQuery(BaseModel):
     """A query for code retrieval."""
@@ -71,6 +82,13 @@ class RetrievalQuery(BaseModel):
             "json_encoders": {datetime: lambda v: v.isoformat()}
         }
     )
+
+class GeminiConfig(BaseModel):
+    """Configuration for Gemini retriever."""
+    
+    api_key: str
+    model: str = Field(default="gemini-1.5-pro", description="Gemini model to use, defaults to Gemini 1.5 Pro")
+    max_tokens: int = Field(default=2000000, description="Maximum tokens to use for context window, defaults to 2M for Gemini 1.5 Pro")
 
 class RetrievalResult(BaseModel):
     """Result of a code retrieval operation."""

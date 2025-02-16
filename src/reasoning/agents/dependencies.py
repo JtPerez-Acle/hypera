@@ -4,10 +4,10 @@ import os
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from .base import BaseAgent
-from ..types import AgentAnalysis, AgentDependencies, CodeContext, DependencyInfo
+from ..types import AgentAnalysis, AgentDependencies, CodeContext, DependencyInfo, MetadataRequest, MetadataExtractionLevel
 
 
-class DependencyAnalyzer(BaseAgent):
+class DependencyAnalysisAgent(BaseAgent):
     """Analyzes code dependencies and relationships."""
 
     def get_system_prompt(self) -> str:
@@ -24,6 +24,16 @@ class DependencyAnalyzer(BaseAgent):
             "   - Dependency graph analysis\n"
             "4. Provide concrete examples and evidence\n"
             "5. Consider behavioral implications"
+        )
+
+    def get_metadata_requirements(self) -> MetadataRequest:
+        """Get metadata requirements for dependency analysis."""
+        return MetadataRequest(
+            extraction_level=MetadataExtractionLevel.DEEP,
+            include_types=True,
+            include_dependencies=True,
+            include_docstrings=True,
+            include_comments=True
         )
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))

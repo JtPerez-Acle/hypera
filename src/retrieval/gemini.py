@@ -37,9 +37,13 @@ class GeminiRetriever:
         - Performance: Async retrieval
     """
     
-    def __init__(self):
-        """Initialize the retriever with necessary clients."""
-        config = GeminiConfig()
+    def __init__(self, config: GeminiConfig):
+        """Initialize the retriever with necessary clients.
+        
+        Args:
+            config: Configuration for the Gemini API
+        """
+        self.config = config
         genai.configure(api_key=config.api_key)
         self.model = genai.GenerativeModel(config.model)
         self.qdrant = get_qdrant_client()

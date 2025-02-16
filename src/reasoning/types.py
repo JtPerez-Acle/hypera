@@ -24,6 +24,32 @@ class MetadataExtractionLevel(Enum):
     COMPREHENSIVE = "comprehensive"  # + cross-file analysis
 
 
+class SecuritySeverity(str, Enum):
+    """Security issue severity levels."""
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+
+class AnalysisType(str, Enum):
+    """Type of analysis performed."""
+    BEHAVIORAL = "behavioral"
+    SECURITY = "security"
+    PATTERNS = "patterns"
+    METRICS = "metrics"
+    DEPENDENCIES = "dependencies"
+    METADATA = "metadata"
+
+
+class Severity(str, Enum):
+    """Severity level of an analysis finding."""
+    ERROR = "error"
+    WARNING = "warning"
+    INFO = "info"
+    DEBUG = "debug"
+
+
 class MetadataRequest(BaseModel):
     """Configuration for metadata extraction requests."""
     model_config = ConfigDict(
@@ -65,9 +91,44 @@ class MetadataRequest(BaseModel):
     )
 
 
+class MetadataRequirement(BaseModel):
+    """Requirement for metadata extraction."""
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "name": "imports",
+                "description": "Import statements",
+                "required": True,
+                "data_type": "List[str]",
+                "validation_rules": ["no_circular_imports"]
+            }
+        }
+    )
+
+    name: str = Field(description="Name of the requirement")
+    description: str = Field(description="Description of what is required")
+    required: bool = Field(default=True, description="Whether this is required")
+    data_type: str = Field(description="Expected data type")
+    validation_rules: Optional[List[str]] = Field(None, description="Validation rules")
+
+
 class CodeMetadata(BaseModel):
     """Structured metadata about a code chunk."""
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(
+        frozen=True,
+        json_schema_extra={
+            "example": {
+                "imports": ["import os", "from typing import List"],
+                "functions": [{"name": "process_data", "params": ["items"]}],
+                "classes": [],
+                "types": {"items": "List[dict]"},
+                "dependencies": {"processor.py": ["database.py"]},
+                "dependency_depth": 1,
+                "docstrings": {"process_data": "Process a list of items"},
+                "comments": ["# This is a comment"]
+            }
+        }
+    )
 
     # Basic information
     imports: List[str] = Field(default_factory=list, description="Import statements")
@@ -133,7 +194,19 @@ class CodeContext(BaseModel):
 
 class SecurityIssue(BaseModel):
     """Security-related findings in the code."""
-    severity: str = Field(description="Severity level (low/medium/high/critical)")
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "severity": "high",
+                "type": "SQL Injection",
+                "description": "Raw SQL query with user input",
+                "line_number": 42,
+                "recommendation": "Use parameterized queries"
+            }
+        }
+    )
+
+    severity: SecuritySeverity = Field(description="Severity level (low/medium/high/critical)")
     type: str = Field(description="Type of security issue")
     description: str = Field(description="Detailed description of the issue")
     line_number: Optional[int] = Field(None, description="Line where issue was found")
@@ -142,6 +215,17 @@ class SecurityIssue(BaseModel):
 
 class DesignPattern(BaseModel):
     """Identified design pattern in the code."""
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "name": "Observer",
+                "confidence": 0.95,
+                "matches": ["Subject.notify()", "Observer.update()"],
+                "explanation": "Found subject-observer relationship"
+            }
+        }
+    )
+
     name: str = Field(description="Name of the design pattern")
     confidence: float = Field(description="Confidence in pattern detection", ge=0.0, le=1.0)
     matches: List[str] = Field(description="Code elements matching the pattern")
@@ -150,6 +234,18 @@ class DesignPattern(BaseModel):
 
 class CodeMetrics(BaseModel):
     """Code quality and complexity metrics."""
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "complexity": 10,
+                "maintainability": 85.5,
+                "cognitive_complexity": 8,
+                "lines_of_code": 150,
+                "comment_ratio": 0.25
+            }
+        }
+    )
+
     complexity: int = Field(description="Cyclomatic complexity")
     maintainability: float = Field(description="Maintainability index", ge=0.0, le=100.0)
     cognitive_complexity: int = Field(description="Cognitive complexity score")
@@ -159,6 +255,17 @@ class CodeMetrics(BaseModel):
 
 class DependencyInfo(BaseModel):
     """Information about code dependencies."""
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "direct_deps": ["database.py", "config.py"],
+                "indirect_deps": ["utils.py"],
+                "circular_deps": [["a.py", "b.py", "a.py"]],
+                "external_deps": {"requests": "2.31.0"}
+            }
+        }
+    )
+
     direct_deps: List[str] = Field(description="Direct dependencies")
     indirect_deps: List[str] = Field(description="Indirect dependencies")
     circular_deps: List[List[str]] = Field(description="Circular dependency chains")
@@ -186,15 +293,14 @@ class AgentDependencies(BaseModel):
 
 
 class AgentAnalysis(BaseModel):
-    """Analysis results from a single agent."""
+    """Analysis result from a single agent."""
     agent_name: str = Field(description="Name of the agent that produced this analysis")
-    understanding_level: CodeUnderstandingLevel = Field(
-        description="Depth of understanding achieved"
-    )
-    findings: Dict[str, Any] = Field(description="Agent-specific analysis findings")
-    confidence: float = Field(description="Confidence in the analysis", ge=0.0, le=1.0)
+    findings: Union[List[str], Dict[str, Any]] = Field(description="Agent-specific analysis findings")
     supporting_evidence: List[str] = Field(description="Evidence supporting the findings")
-    warnings: Optional[List[str]] = Field(None, description="Potential issues identified")
+    confidence: float = Field(description="Confidence in the analysis", ge=0.0, le=1.0)
+    analysis_type: AnalysisType = Field(description="Type of analysis performed")
+    severity: Severity = Field(description="Severity level of the analysis finding")
+    success: bool = Field(default=True, description="Whether the analysis was successful")
 
 
 class ComprehensiveAnalysis(BaseModel):
@@ -203,6 +309,7 @@ class ComprehensiveAnalysis(BaseModel):
         json_schema_extra={
             "example": {
                 "query": "What are the side effects of this function?",
+                "code_context": {"code_snippet": "...", "file_path": "..."},
                 "agent_analyses": [
                     {
                         "agent_name": "behavioral_analyzer",
@@ -216,12 +323,14 @@ class ComprehensiveAnalysis(BaseModel):
                 "metrics": {"complexity": 5, "maintainability": 85.0},
                 "dependencies": {"direct_deps": ["database.py"]},
                 "summary": "The function has side effects...",
-                "recommendations": ["Add input validation", "Document side effects"]
+                "recommendations": ["Add input validation", "Document side effects"],
+                "warnings": ["Potential SQL injection vulnerability"]
             }
         }
     )
 
     query: str = Field(description="The original analysis query")
+    code_context: CodeContext = Field(description="Context about the code being analyzed")
     agent_analyses: List[AgentAnalysis] = Field(
         description="Individual analyses from each agent"
     )
@@ -241,3 +350,16 @@ class ComprehensiveAnalysis(BaseModel):
     recommendations: List[str] = Field(
         description="Recommended improvements"
     )
+    warnings: Optional[List[str]] = Field(
+        default_factory=list,
+        description="Warnings and issues encountered during analysis"
+    )
+
+
+class GPT4MiniModel(BaseModel):
+    """Configuration for GPT4Mini model."""
+    
+    api_key: str
+    max_tokens: int = Field(default=8192, description="Maximum tokens to use for context window")
+    temperature: float = Field(default=0.7, description="Temperature for text generation")
+    top_p: float = Field(default=0.95, description="Top-p sampling parameter")

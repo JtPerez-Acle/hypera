@@ -4,27 +4,27 @@ import os
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from .base import BaseAgent
-from ..types import AgentAnalysis, AgentDependencies, CodeContext, CodeMetrics
+from ..types import AgentAnalysis, AgentDependencies, CodeContext, CodeMetrics, MetadataExtractionLevel
 
 
-class MetricsAnalyzer(BaseAgent):
+class MetricsAnalysisAgent(BaseAgent):
     """Analyzes code for quality metrics and complexity."""
 
+    def get_metadata_requirements(self) -> MetadataExtractionLevel:
+        """Get metadata requirements for metrics analysis."""
+        return MetadataExtractionLevel.FULL
+
     def get_system_prompt(self) -> str:
-        return (
-            "You are an expert in code quality and metrics analysis. "
-            "Your analysis should:\n"
-            "1. Leverage the rich metadata provided\n"
-            "2. Consider the full context from Gemini retrieval\n"
-            "3. Calculate and evaluate:\n"
-            "   - Code complexity metrics\n"
-            "   - Maintainability indices\n"
-            "   - Code quality indicators\n"
-            "   - Testing coverage needs\n"
-            "   - Technical debt indicators\n"
-            "4. Provide concrete examples and evidence\n"
-            "5. Consider behavioral implications"
-        )
+        """Get system prompt for metrics analysis."""
+        return """You are a code quality expert analyzing code metrics and complexity.
+        Focus on identifying:
+        1. Cyclomatic complexity
+        2. Code duplication
+        3. Function/method size
+        4. Code maintainability
+        5. Performance considerations
+        
+        Provide detailed analysis of code metrics and suggest improvements."""
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     async def analyze(self, code_context: CodeContext) -> CodeMetrics:

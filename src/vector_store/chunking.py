@@ -1,40 +1,17 @@
 """
-Code chunking and metadata extraction module.
+Code chunking with minimal structural parsing.
 
-This module handles the splitting of code into logical chunks and extraction
-of rich metadata for each chunk.
+This module handles basic code splitting, leaving deep analysis to LLM.
 """
 
 import ast
-from typing import List, Dict, Any, Generator, Optional
+from typing import Generator, Optional
+from datetime import datetime
 from pathlib import Path
-from .schema import CodeChunkPayload, CodeChunkMetadata, CodeChunkType, Language
-
-class ChunkingConfig:
-    """Configuration for code chunking."""
-    # Maximum size for a code chunk (in characters)
-    MAX_CHUNK_SIZE = 2000
-    
-    # Minimum size for a code chunk (in characters)
-    MIN_CHUNK_SIZE = 50
-    
-    # Overlap between chunks (in characters)
-    CHUNK_OVERLAP = 100
+from .schema import CodeChunkPayload, CodeChunkMetadata, Language
 
 def detect_language(file_path: str) -> Language:
-    """
-    Detect the programming language of a file based on its extension.
-    
-    Args:
-        file_path: Path to the file
-        
-    Returns:
-        Language: Detected programming language
-        
-    Metadata:
-        - Dependencies: Language enum
-        - Error Handling: Unknown extensions
-    """
+    """Detect the programming language of a file based on its extension."""
     ext = Path(file_path).suffix.lower()
     return {
         '.py': Language.PYTHON,
@@ -42,195 +19,77 @@ def detect_language(file_path: str) -> Language:
         '.ts': Language.TYPESCRIPT
     }.get(ext, Language.UNKNOWN)
 
-def extract_python_metadata(node: ast.AST) -> Dict[str, Any]:
+def chunk_python_file(file_path: str) -> Generator[CodeChunkPayload, None, None]:
     """
-    Extract metadata from a Python AST node.
-    
-    Args:
-        node: AST node to analyze
-        
-    Returns:
-        Dict[str, Any]: Extracted metadata
-        
-    Metadata:
-        - Dependencies: ast module
-        - AST Analysis: Function/class details
+    Split a Python file into basic structural chunks.
+    Minimal parsing, letting LLM handle deep analysis.
     """
-    metadata = {
-        'type': type(node).__name__,
-        'lineno': getattr(node, 'lineno', None),
-        'end_lineno': getattr(node, 'end_lineno', None),
-    }
+    with open(file_path, 'r') as f:
+        content = f.read()
     
-    if isinstance(node, ast.FunctionDef):
-        metadata.update({
-            'name': node.name,
-            'args': [arg.arg for arg in node.args.args],
-            'returns': getattr(node.returns, 'id', None) if node.returns else None,
-            'decorators': [ast.unparse(d) for d in node.decorator_list],
-            'docstring': ast.get_docstring(node)
-        })
-    elif isinstance(node, ast.ClassDef):
-        metadata.update({
-            'name': node.name,
-            'bases': [ast.unparse(base) for base in node.bases],
-            'decorators': [ast.unparse(d) for d in node.decorator_list],
-            'docstring': ast.get_docstring(node)
-        })
-    
-    return metadata
-
-def extract_imports(code: str, language: Language) -> List[str]:
-    """
-    Extract import statements from code.
-    
-    Args:
-        code: Source code to analyze
-        language: Programming language of the code
+    try:
+        # Basic structural validation only
+        ast.parse(content)  # Validate syntax
         
-    Returns:
-        List[str]: List of imported modules/packages
+        # Simple splitting on common structural markers
+        chunks = []
+        current_chunk = []
+        current_start = 1
         
-    Metadata:
-        - Dependencies: ast module for Python
-        - Language Support: Python (others TODO)
-    """
-    imports = []
-    if language == Language.PYTHON:
-        try:
-            tree = ast.parse(code)
-            for node in ast.walk(tree):
-                if isinstance(node, ast.Import):
-                    imports.extend(name.name for name in node.names)
-                elif isinstance(node, ast.ImportFrom):
-                    module = node.module or ''
-                    imports.extend(f"{module}.{name.name}" for name in node.names)
-        except SyntaxError:
-            pass  # Handle partial code chunks that might not parse
-    return imports
+        for i, line in enumerate(content.split('\n'), 1):
+            line = line.strip()
+            if line.startswith(('class ', 'def ', 'async def ')):
+                if current_chunk:
+                    chunk_content = '\n'.join(current_chunk)
+                    yield create_chunk(
+                        content=chunk_content,
+                        file_path=file_path,
+                        start_line=current_start,
+                        end_line=i-1,
+                        chunk_type='code_block',
+                        language=Language.PYTHON
+                    )
+                current_chunk = [line]
+                current_start = i
+            else:
+                current_chunk.append(line)
+        
+        # Last chunk
+        if current_chunk:
+            chunk_content = '\n'.join(current_chunk)
+            yield create_chunk(
+                content=chunk_content,
+                file_path=file_path,
+                start_line=current_start,
+                end_line=len(content.split('\n')),
+                chunk_type='code_block',
+                language=Language.PYTHON
+            )
+            
+    except SyntaxError as e:
+        # Only basic syntax validation
+        raise ValueError(f"Invalid Python syntax in {file_path}: {str(e)}")
 
 def create_chunk(
     content: str,
     file_path: str,
     start_line: int,
     end_line: int,
-    chunk_type: CodeChunkType,
+    chunk_type: str,
     language: Language,
-    ast_data: Optional[Dict[str, Any]] = None
 ) -> CodeChunkPayload:
-    """
-    Create a code chunk with metadata.
-    
-    Args:
-        content: Code content
-        file_path: Path to source file
-        start_line: Starting line number
-        end_line: Ending line number
-        chunk_type: Type of code chunk
-        language: Programming language
-        ast_data: Optional AST metadata
-        
-    Returns:
-        CodeChunkPayload: Created chunk with metadata
-        
-    Metadata:
-        - Dependencies: CodeChunkPayload, CodeChunkMetadata
-        - Rich Context: Combines code and metadata
-    """
-    imports = extract_imports(content, language)
-    
+    """Create a code chunk with basic metadata."""
     metadata = CodeChunkMetadata(
         chunk_type=chunk_type,
-        language=language,
+        language=language.value,
         file_path=file_path,
         start_line=start_line,
         end_line=end_line,
-        imports=imports,
-        ast_data=ast_data or {}
+        created_at=datetime.now(),
+        updated_at=datetime.now()
     )
     
     return CodeChunkPayload(
         content=content,
         metadata=metadata
     )
-
-def chunk_python_file(file_path: str) -> Generator[CodeChunkPayload, None, None]:
-    """
-    Split a Python file into logical chunks with metadata.
-    
-    Args:
-        file_path: Path to Python file
-        
-    Yields:
-        CodeChunkPayload: Code chunks with metadata
-        
-    Metadata:
-        - Dependencies: ast module
-        - Chunking Strategy: Function/class based
-        - Rich Context: AST metadata
-    """
-    with open(file_path, 'r') as f:
-        content = f.read()
-    
-    try:
-        tree = ast.parse(content)
-        
-        # Process classes and functions as main chunks
-        for node in ast.walk(tree):
-            if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
-                chunk_content = ast.get_source_segment(content, node)
-                if chunk_content:
-                    chunk_type = (CodeChunkType.FUNCTION 
-                                if isinstance(node, ast.FunctionDef)
-                                else CodeChunkType.CLASS)
-                    
-                    yield create_chunk(
-                        content=chunk_content,
-                        file_path=file_path,
-                        start_line=node.lineno,
-                        end_line=node.end_lineno or node.lineno,
-                        chunk_type=chunk_type,
-                        language=Language.PYTHON,
-                        ast_data=extract_python_metadata(node)
-                    )
-        
-        # Handle remaining code as statement chunks
-        # TODO: Implement smarter chunking for statements
-        
-    except SyntaxError:
-        # If parsing fails, fall back to simple line-based chunking
-        lines = content.splitlines()
-        current_chunk = []
-        current_size = 0
-        start_line = 1
-        
-        for i, line in enumerate(lines, 1):
-            line_size = len(line)
-            if current_size + line_size > ChunkingConfig.MAX_CHUNK_SIZE and current_chunk:
-                chunk_content = '\n'.join(current_chunk)
-                yield create_chunk(
-                    content=chunk_content,
-                    file_path=file_path,
-                    start_line=start_line,
-                    end_line=i - 1,
-                    chunk_type=CodeChunkType.BLOCK,
-                    language=Language.PYTHON
-                )
-                current_chunk = []
-                current_size = 0
-                start_line = i
-            
-            current_chunk.append(line)
-            current_size += line_size
-        
-        # Handle the last chunk
-        if current_chunk:
-            chunk_content = '\n'.join(current_chunk)
-            yield create_chunk(
-                content=chunk_content,
-                file_path=file_path,
-                start_line=start_line,
-                end_line=len(lines),
-                chunk_type=CodeChunkType.BLOCK,
-                language=Language.PYTHON
-            )

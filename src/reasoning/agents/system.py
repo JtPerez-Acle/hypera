@@ -1,156 +1,308 @@
-"""Reasoning system that orchestrates multiple agents for comprehensive code analysis."""
+"""
+Multi-agent reasoning system for code analysis.
+"""
 
-from typing import List, Optional, Dict, Any
-from ...metadata.extractor import MetadataExtractor
-from ...metadata.types import MetadataRequest, MetadataExtractionLevel
+from typing import List, Dict, Any, Optional
+import asyncio
+import logging
+from datetime import datetime, UTC
+from zoneinfo import ZoneInfo
+
 from ..types import (
     AgentAnalysis,
     CodeContext,
     ComprehensiveAnalysis,
+    CodeUnderstandingLevel,
     SecurityIssue,
     DesignPattern,
     CodeMetrics,
-    DependencyInfo,
-    AgentDependencies
+    DependencyInfo
 )
+from .base import BaseAgent
+from .metadata_agent import MetadataGenerationAgent
+from .patterns import PatternAnalysisAgent
+from .security import SecurityAnalysisAgent
+from .behavioral import BehavioralAnalysisAgent
+from .dependencies import DependencyAnalysisAgent
+from .metrics import MetricsAnalysisAgent
+from src.retrieval.gemini import GeminiRetriever
+from src.reasoning.types import GPT4MiniModel
 
+logger = logging.getLogger(__name__)
 
 class ReasoningSystem:
-    """Orchestrates multiple agents for comprehensive code analysis."""
-
+    """System for coordinating multiple reasoning agents."""
+    
     def __init__(
         self,
-        metadata_extractor: Optional[MetadataExtractor] = None,
-        gemini_retriever: Optional[GeminiRetriever] = None
+        metadata_extractor: MetadataGenerationAgent,
+        gemini_retriever: GeminiRetriever,
+        model: Optional[GPT4MiniModel] = None
     ):
         """Initialize the reasoning system.
         
         Args:
-            metadata_extractor: Component for extracting rich metadata
-            gemini_retriever: Component for retrieving relevant context
+            metadata_extractor: Agent for generating metadata
+            gemini_retriever: Retriever for similar code examples
+            model: Optional GPT4Mini model for analysis
         """
-        # Initialize shared components
-        self.metadata_extractor = metadata_extractor or MetadataExtractor()
-        self.gemini_retriever = gemini_retriever or GeminiRetriever()
+        self.metadata_extractor = metadata_extractor
+        self.gemini_retriever = gemini_retriever
+        self.model = model
         
-        # Initialize agents with shared components
+        # Initialize analysis agents
+        self.behavioral_agent = BehavioralAnalysisAgent(
+            metadata_extractor=metadata_extractor,
+            gemini_retriever=gemini_retriever,
+            model=model
+        )
+        self.security_agent = SecurityAnalysisAgent(
+            metadata_extractor=metadata_extractor,
+            gemini_retriever=gemini_retriever,
+            model=model
+        )
+        self.pattern_agent = PatternAnalysisAgent(
+            metadata_extractor=metadata_extractor,
+            gemini_retriever=gemini_retriever,
+            model=model
+        )
+        self.metrics_agent = MetricsAnalysisAgent(
+            metadata_extractor=metadata_extractor,
+            gemini_retriever=gemini_retriever,
+            model=model
+        )
+        self.dependency_agent = DependencyAnalysisAgent(
+            metadata_extractor=metadata_extractor,
+            gemini_retriever=gemini_retriever,
+            model=model
+        )
+        
         self.agents = {
-            "behavioral": BehavioralAnalyzer(
-                metadata_extractor=self.metadata_extractor,
-                gemini_retriever=self.gemini_retriever
-            ),
-            "security": SecurityAnalyzer(
-                metadata_extractor=self.metadata_extractor,
-                gemini_retriever=self.gemini_retriever
-            ),
-            "patterns": PatternAnalyzer(
-                metadata_extractor=self.metadata_extractor,
-                gemini_retriever=self.gemini_retriever
-            ),
-            "metrics": MetricsAnalyzer(
-                metadata_extractor=self.metadata_extractor,
-                gemini_retriever=self.gemini_retriever
-            ),
-            "dependencies": DependencyAnalyzer(
-                metadata_extractor=self.metadata_extractor,
-                gemini_retriever=self.gemini_retriever
-            ),
+            "behavioral": self.behavioral_agent,
+            "security": self.security_agent,
+            "pattern": self.pattern_agent,
+            "metrics": self.metrics_agent,
+            "dependency": self.dependency_agent
         }
-
-    async def analyze(self, query: str, code_context: CodeContext) -> ComprehensiveAnalysis:
-        """
-        Perform comprehensive code analysis using all agents.
-
-        This method:
-        1. Enriches the context with metadata and related information
-        2. Runs all agents in parallel for efficiency
-        3. Combines their analyses into a comprehensive result
-        4. Uses Gemini to generate natural language summaries
+    
+    @classmethod
+    def create_default(
+        cls,
+        gpt4_mini_key: Optional[str] = None,
+        gemini_key: Optional[str] = None
+    ) -> 'ReasoningSystem':
+        """Create a default reasoning system.
         
         Args:
-            query: The analysis query from the user
-            code_context: Context about the code to analyze
-
+            gpt4_mini_key: Optional GPT4Mini API key
+            gemini_key: Optional Gemini API key
+            
         Returns:
-            A comprehensive analysis combining all agent results
+            Configured reasoning system
         """
-        # First, enrich the context once for all agents
-        enriched_context = await self.agents["behavioral"]._enrich_context(code_context)
-        
-        # Run all agents in parallel
-        behavioral_analysis = await self.agents["behavioral"].analyze(enriched_context)
-        security_issues = await self.agents["security"].analyze(enriched_context)
-        design_patterns = await self.agents["patterns"].analyze(enriched_context)
-        metrics = await self.agents["metrics"].analyze(enriched_context)
-        dependencies = await self.agents["dependencies"].analyze(enriched_context)
-
-        # Use Gemini to generate a natural language summary
-        summary = await self._generate_summary_with_gemini(
-            query,
-            behavioral_analysis,
-            security_issues,
-            design_patterns,
-            metrics,
-            dependencies
-        )
-
-        # Generate recommendations
-        recommendations = await self._generate_recommendations_with_gemini(
-            security_issues,
-            design_patterns,
-            metrics,
-            dependencies
-        )
-
-        return ComprehensiveAnalysis(
-            query=query,
-            agent_analyses=[behavioral_analysis],  # Add other agent analyses
-            security_issues=security_issues,
-            design_patterns=design_patterns,
-            metrics=metrics,
-            dependencies=dependencies,
-            summary=summary,
-            recommendations=recommendations
-        )
-
-    async def _generate_summary_with_gemini(
+        model = GPT4MiniModel(api_key=gpt4_mini_key) if gpt4_mini_key else None
+        metadata_extractor = MetadataGenerationAgent(model=model)
+        gemini_retriever = GeminiRetriever(api_key=gemini_key) if gemini_key else None
+        return cls(metadata_extractor, gemini_retriever, model)
+    
+    async def analyze(
         self,
-        query: str,
-        behavioral: AgentAnalysis,
-        security: List[SecurityIssue],
-        patterns: List[DesignPattern],
-        metrics: CodeMetrics,
-        dependencies: DependencyInfo,
+        context: CodeContext,
+        query: Optional[str] = None
+    ) -> ComprehensiveAnalysis:
+        """Analyze code using all available agents.
+        
+        Args:
+            context: Context about the code being analyzed
+            query: Optional query for the analysis
+            
+        Returns:
+            Comprehensive analysis from all agents
+        """
+        try:
+            # Create tasks for each agent
+            tasks = [
+                asyncio.create_task(self._run_agent_with_timeout(agent, context))
+                for agent in self.agents.values()
+            ]
+            
+            # Run tasks with semaphore for parallel control
+            sem = asyncio.Semaphore(1)
+            async with sem:
+                analyses = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Filter out exceptions and collect issues
+            valid_analyses = []
+            issues = []
+            for analysis in analyses:
+                if isinstance(analysis, Exception):
+                    issues.append(str(analysis))
+                else:
+                    valid_analyses.append(analysis)
+            
+            # Extract specific findings
+            security_issues: List[SecurityIssue] = []
+            design_patterns: List[DesignPattern] = []
+            code_metrics: Optional[CodeMetrics] = None
+            dependencies: List[DependencyInfo] = []
+            recommendations: List[str] = []
+            
+            for analysis in valid_analyses:
+                findings = analysis.findings
+                
+                # Security findings
+                if analysis.agent_name == "security_analyzer":
+                    security_issues.extend(findings.get("issues", []))
+                    recommendations.extend(findings.get("recommendations", []))
+                
+                # Pattern findings
+                elif analysis.agent_name == "pattern_analyzer":
+                    design_patterns.extend(findings.get("patterns", []))
+                    recommendations.extend(findings.get("recommendations", []))
+                
+                # Metrics findings
+                elif analysis.agent_name == "metrics_analyzer":
+                    metrics = findings.get("metrics")
+                    if metrics:
+                        code_metrics = CodeMetrics(**metrics)
+                
+                # Dependency findings
+                elif analysis.agent_name == "dependency_analyzer":
+                    dependencies.extend(findings.get("dependencies", []))
+            
+            # Generate summary
+            summary = self._generate_summary(
+                valid_analyses,
+                security_issues,
+                design_patterns,
+                code_metrics,
+                dependencies,
+                issues
+            )
+            
+            return ComprehensiveAnalysis(
+                query=query or "",  # Empty string instead of None
+                code_context=context,
+                agent_analyses=valid_analyses,
+                summary=summary,
+                security_issues=security_issues,
+                design_patterns=design_patterns,
+                code_metrics=code_metrics,
+                dependencies=dependencies[0] if dependencies else DependencyInfo(
+                    direct_deps=[],
+                    indirect_deps=[],
+                    circular_deps=[],
+                    external_deps={}
+                ),  # Default DependencyInfo with empty values
+                recommendations=recommendations,
+                warnings=issues,
+                timestamp=datetime.now(UTC),
+                success=all(a.confidence > 0.5 for a in valid_analyses)
+            )
+            
+        except Exception as e:
+            return ComprehensiveAnalysis(
+                query="",  # Empty string instead of None
+                code_context=context,
+                agent_analyses=[],
+                summary=f"Error during analysis: {str(e)}",
+                security_issues=[],
+                design_patterns=[],
+                code_metrics=None,
+                dependencies=DependencyInfo(
+                    direct_deps=[],
+                    indirect_deps=[],
+                    circular_deps=[],
+                    external_deps={}
+                ),  # Default DependencyInfo with empty values
+                recommendations=[],
+                warnings=[str(e)],
+                timestamp=datetime.now(UTC),
+                success=False
+            )
+    
+    async def _run_agent_with_timeout(
+        self,
+        agent: BaseAgent,
+        context: CodeContext
+    ) -> AgentAnalysis:
+        """Run an agent's analysis with timeout.
+        
+        Args:
+            agent: Agent to run
+            context: Code context to analyze
+            
+        Returns:
+            Agent's analysis or error analysis if timeout
+        """
+        try:
+            return await asyncio.wait_for(
+                agent.analyze(context),
+                timeout=30
+            )
+        except asyncio.TimeoutError:
+            return AgentAnalysis(
+                agent_name=agent.name,
+                understanding_level=CodeUnderstandingLevel.SURFACE,
+                findings={"error": "Analysis timed out"},
+                confidence=0.0,
+                warnings=[f"Agent timed out after 30 seconds"]
+            )
+        except Exception as e:
+            return AgentAnalysis(
+                agent_name=agent.name,
+                understanding_level=CodeUnderstandingLevel.SURFACE,
+                findings={"error": str(e)},
+                confidence=0.0,
+                warnings=[f"Agent failed: {str(e)}"]
+            )
+
+    def _generate_summary(
+        self,
+        analyses: List[Any],
+        security_issues: List[SecurityIssue],
+        design_patterns: List[DesignPattern],
+        code_metrics: Optional[CodeMetrics],
+        dependencies: List[DependencyInfo],
+        issues: List[str]
     ) -> str:
-        """Generate a comprehensive summary using Gemini 1.5 Pro."""
-        # Prepare the context for Gemini
-        context = {
-            "query": query,
-            "behavioral_analysis": behavioral.dict(),
-            "security_issues": [issue.dict() for issue in security],
-            "design_patterns": [pattern.dict() for pattern in patterns],
-            "metrics": metrics.dict(),
-            "dependencies": dependencies.dict()
-        }
+        """Generate a summary of the analysis results."""
+        summary_parts = []
         
-        # Use Gemini to generate a natural language summary
-        return await self.gemini_retriever.generate_summary(context)
-
-    async def _generate_recommendations_with_gemini(
-        self,
-        security: List[SecurityIssue],
-        patterns: List[DesignPattern],
-        metrics: CodeMetrics,
-        dependencies: DependencyInfo,
-    ) -> List[str]:
-        """Generate actionable recommendations using Gemini 1.5 Pro."""
-        # Prepare the context for Gemini
-        context = {
-            "security_issues": [issue.dict() for issue in security],
-            "design_patterns": [pattern.dict() for pattern in patterns],
-            "metrics": metrics.dict(),
-            "dependencies": dependencies.dict()
-        }
+        # Add analysis overview
+        summary_parts.append(
+            f"Analyzed code using {len(analyses)} agents"
+        )
         
-        # Use Gemini to generate recommendations
-        return await self.gemini_retriever.generate_recommendations(context)
+        # Add security summary
+        if security_issues:
+            summary_parts.append(
+                f"Found {len(security_issues)} security issues"
+            )
+        
+        # Add patterns summary
+        if design_patterns:
+            summary_parts.append(
+                f"Identified {len(design_patterns)} design patterns"
+            )
+        
+        # Add metrics summary
+        if code_metrics:
+            summary_parts.append(
+                f"Code metrics: complexity={code_metrics.complexity:.2f}, "
+                f"maintainability={code_metrics.maintainability:.2f}"
+            )
+        
+        # Add dependency summary
+        if dependencies:
+            summary_parts.append(
+                f"Found {len(dependencies)} dependencies"
+            )
+        
+        # Add issues if any
+        if issues:
+            summary_parts.append(
+                f"Encountered {len(issues)} issues during analysis"
+            )
+        
+        return "\n".join(summary_parts)

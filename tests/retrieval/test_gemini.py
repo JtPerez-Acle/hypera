@@ -12,15 +12,23 @@ from src.retrieval.types import (
     RetrievalQuery,
     RetrievalFilter,
     QueryType,
-    CodeContext
+    CodeContext,
+    GeminiConfig
 )
 from src.retrieval.gemini import GeminiRetriever
 
+@pytest.fixture
+def gemini_config():
+    """Create test Gemini config."""
+    return GeminiConfig(
+        api_key="test-key",
+        max_tokens=1000000
+    )
+
 @pytest.mark.asyncio
-async def test_retrieval_basic(mock_gemini_client, mock_qdrant_client):
+async def test_retrieval_basic(mock_gemini_client, mock_qdrant_client, gemini_config):
     """Test basic retrieval functionality."""
-    # Initialize retriever
-    retriever = GeminiRetriever()
+    retriever = GeminiRetriever(gemini_config)
     retriever.qdrant = mock_qdrant_client
     
     # Create test query
@@ -41,9 +49,9 @@ async def test_retrieval_basic(mock_gemini_client, mock_qdrant_client):
     assert result.query == query
 
 @pytest.mark.asyncio
-async def test_retrieval_with_filters(mock_gemini_client, mock_qdrant_client):
+async def test_retrieval_with_filters(mock_gemini_client, mock_qdrant_client, gemini_config):
     """Test retrieval with various filters."""
-    retriever = GeminiRetriever()
+    retriever = GeminiRetriever(gemini_config)
     retriever.qdrant = mock_qdrant_client
     
     # Create query with filters
@@ -70,9 +78,9 @@ async def test_retrieval_with_filters(mock_gemini_client, mock_qdrant_client):
     assert all(score >= 0.8 for score in result.similarity_scores)
 
 @pytest.mark.asyncio
-async def test_context_enrichment(mock_gemini_client, mock_qdrant_client):
+async def test_context_enrichment(mock_gemini_client, mock_qdrant_client, gemini_config):
     """Test context enrichment using Gemini."""
-    retriever = GeminiRetriever()
+    retriever = GeminiRetriever(gemini_config)
     retriever.qdrant = mock_qdrant_client
     
     # Create test chunks
@@ -100,9 +108,9 @@ async def test_context_enrichment(mock_gemini_client, mock_qdrant_client):
     assert context.documentation is not None
 
 @pytest.mark.asyncio
-async def test_retrieval_error_handling(mock_gemini_client, mock_qdrant_client):
+async def test_retrieval_error_handling(mock_gemini_client, mock_qdrant_client, gemini_config):
     """Test error handling in retrieval."""
-    retriever = GeminiRetriever()
+    retriever = GeminiRetriever(gemini_config)
     retriever.qdrant = mock_qdrant_client
     
     # Simulate Qdrant error
@@ -119,9 +127,9 @@ async def test_retrieval_error_handling(mock_gemini_client, mock_qdrant_client):
         await retriever.retrieve(query)
 
 @pytest.mark.asyncio
-async def test_query_types(mock_gemini_client, mock_qdrant_client):
+async def test_query_types(mock_gemini_client, mock_qdrant_client, gemini_config):
     """Test different query types."""
-    retriever = GeminiRetriever()
+    retriever = GeminiRetriever(gemini_config)
     retriever.qdrant = mock_qdrant_client
     
     # Test each query type
@@ -135,9 +143,9 @@ async def test_query_types(mock_gemini_client, mock_qdrant_client):
         assert result.query.query_type == query_type
 
 @pytest.mark.asyncio
-async def test_large_context_handling(mock_gemini_client, mock_qdrant_client):
+async def test_large_context_handling(mock_gemini_client, mock_qdrant_client, gemini_config):
     """Test handling of large context windows."""
-    retriever = GeminiRetriever()
+    retriever = GeminiRetriever(gemini_config)
     retriever.qdrant = mock_qdrant_client
     
     # Create a query that would result in large context

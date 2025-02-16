@@ -1,9 +1,0 @@
-pyproject.toml
-src/__init__.py
-src/config/__init__.py
-src/hypera.egg-info/PKG-INFO
-src/hypera.egg-info/SOURCES.txt
-src/hypera.egg-info/dependency_links.txt
-src/hypera.egg-info/requires.txt
-src/hypera.egg-info/top_level.txt
-src/metadata/metadata_manager.py
